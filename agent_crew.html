@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Agent Crew — a lead agent that coordinates a team</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F7F8FA; --panel: #FFFFFF; --border: #E4E7EC;
+    --ink: #1A1D24; --ink-dim: #6B7280;
+    --brand: #2F6FED; --brand-dim: #EAF0FE;
+    --good: #16A34A; --warn: #D97706;
+    --font: 'Inter', sans-serif; --font-mono: 'JetBrains Mono', monospace;
+    box-sizing: border-box; padding-top: env(safe-area-inset-top,0px); padding-bottom: env(safe-area-inset-bottom,0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg:#14161B; --panel:#1C1F26; --border:#2A2E37; --ink:#F0F1F4; --ink-dim:#9AA1AE; --brand-dim:#1E2A47; }
+  }
+  :root[data-theme="dark"] { --bg:#14161B; --panel:#1C1F26; --border:#2A2E37; --ink:#F0F1F4; --ink-dim:#9AA1AE; --brand-dim:#1E2A47; }
+  * { box-sizing: border-box; }
+  html { height:100%; }
+  body { margin:0; min-height:100%; background: var(--bg); color: var(--ink); font-family: var(--font); -webkit-font-smoothing:antialiased; }
+  .wrap { max-width: 720px; margin:0 auto; padding: 28px 16px 50px; }
+
+  .eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing:0.1em; color: var(--brand); text-transform: uppercase; margin-bottom: 8px; }
+  h1 { font-size: 24px; font-weight: 700; margin: 0 0 6px; }
+  .sub { color: var(--ink-dim); font-size: 14px; line-height:1.55; max-width: 60ch; margin-bottom: 22px; }
+
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 18px; }
+  textarea#goalInput {
+    width:100%; resize: vertical; min-height: 70px; border:1px solid var(--border); border-radius:10px;
+    padding: 12px 14px; font-family: var(--font); font-size: 14px; color: var(--ink); background: var(--bg);
+  }
+  textarea#goalInput:focus { outline:2px solid var(--brand); outline-offset:-1px; border-color: var(--brand); }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; margin-top: 10px; }
+  .chip { font-size:12px; background: var(--bg); border:1px solid var(--border); color: var(--ink-dim); padding:6px 12px; border-radius:20px; cursor:pointer; }
+  .chip:hover { border-color: var(--brand); color: var(--brand); }
+  button#startBtn {
+    margin-top: 14px; width:100%; background: var(--brand); color:#fff; border:none; border-radius:10px;
+    padding: 13px; font-family: var(--font); font-weight:600; font-size:14.5px; cursor:pointer;
+  }
+  button#startBtn:hover:not(:disabled) { filter: brightness(1.08); }
+  button#startBtn:disabled { opacity:0.5; cursor:wait; }
+
+  #crew { display:none; margin-top: 26px; }
+
+  .lead-card {
+    background: var(--panel); border: 1.5px solid var(--brand); border-radius: 14px; padding: 18px;
+    margin-bottom: 4px;
+  }
+  .lead-card .role { font-family: var(--font-mono); font-size: 10.5px; color: var(--brand); letter-spacing:0.06em; margin-bottom: 6px; }
+  .lead-card .plan { font-size: 13.5px; line-height:1.6; color: var(--ink); }
+
+  .connector { width: 2px; height: 22px; background: var(--border); margin: 0 auto; }
+
+  .agent-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px;
+    margin-bottom: 4px; opacity: 0.5; transition: opacity 0.3s ease, border-color 0.3s ease;
+  }
+  .agent-card.active { opacity: 1; border-color: var(--brand); }
+  .agent-card.done { opacity: 1; }
+  .agent-head { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .agent-name { font-weight: 600; font-size: 14.5px; }
+  .agent-task { font-size: 12px; color: var(--ink-dim); margin-top: 3px; }
+  .agent-status { font-family: var(--font-mono); font-size: 10.5px; padding: 3px 9px; border-radius: 20px; white-space:nowrap; }
+  .agent-status.queued { background: var(--bg); color: var(--ink-dim); }
+  .agent-status.working { background: var(--brand-dim); color: var(--brand); }
+  .agent-status.done { background: rgba(22,163,74,0.12); color: var(--good); }
+  .agent-output {
+    margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 13px; line-height: 1.6;
+    color: var(--ink); display: none; white-space: pre-wrap;
+  }
+  .agent-output.show { display: block; }
+  .spinner {
+    display:inline-block; width:11px; height:11px; border:2px solid var(--brand-dim); border-top-color: var(--brand);
+    border-radius:50%; animation: spin 0.7s linear infinite; margin-right: 5px; vertical-align: -1px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .final-card {
+    background: var(--brand-dim); border: 1.5px solid var(--brand); border-radius: 14px; padding: 20px;
+    margin-top: 22px; display: none;
+  }
+  .final-card .role { font-family: var(--font-mono); font-size: 10.5px; color: var(--brand); letter-spacing:0.06em; margin-bottom: 8px; }
+  .final-card .signoff { font-size: 13.5px; color: var(--ink); line-height: 1.6; margin-bottom: 14px; }
+  .final-card .deliverable {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px;
+    font-size: 13.5px; line-height: 1.65; white-space: pre-wrap;
+  }
+
+  .restart-row { text-align:center; margin-top: 20px; display:none; }
+  .restart-row button {
+    background:transparent; border:1px solid var(--border); color: var(--ink-dim); font-family: var(--font-mono);
+    font-size: 12px; padding: 9px 16px; border-radius: 8px; cursor:pointer;
+  }
+  .restart-row button:hover { border-color: var(--brand); color: var(--brand); }
+
+  footer.credit { text-align:center; margin-top: 30px; font-size:11px; color: var(--ink-dim); opacity:0.7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Multi-Agent Coordination Demo</div>
+  <h1>Agent Crew</h1>
+  <p class="sub">Give it a goal. A lead agent plans the work and assigns it to a small team of specialist agents — each one actually runs in sequence, building on the previous agent's real output, before the lead signs off on the finished result.</p>
+
+  <div class="panel">
+    <textarea id="goalInput" placeholder="e.g. Write a launch announcement for our new eco-friendly water bottle"></textarea>
+    <div class="chips" id="chips"></div>
+    <button id="startBtn">Assign to the crew</button>
+  </div>
+
+  <div id="crew">
+    <div class="lead-card">
+      <div class="role">LEAD AGENT — PLAN</div>
+      <div class="plan" id="leadPlan"></div>
+    </div>
+    <div class="connector"></div>
+    <div id="agentList"></div>
+    <div class="final-card" id="finalCard">
+      <div class="role">LEAD AGENT — SIGN-OFF</div>
+      <div class="signoff" id="finalSignoff"></div>
+      <div class="deliverable" id="finalDeliverable"></div>
+    </div>
+  </div>
+
+  <div class="restart-row" id="restartRow"><button id="restartBtn">Assign a new goal</button></div>
+
+  <footer class="credit">Agent Crew — built with the Claude API</footer>
+</div>
+
+<script>
+const STARTERS = [
+  "Write a launch announcement for our new eco-friendly water bottle",
+  "Draft a short onboarding email sequence for new app users",
+  "Summarize competitor pricing strategies and recommend our positioning"
+];
+const chipsEl = document.getElementById('chips');
+STARTERS.forEach(s => {
+  const c = document.createElement('button');
+  c.className = 'chip'; c.type = 'button'; c.textContent = s;
+  c.addEventListener('click', () => { document.getElementById('goalInput').value = s; });
+  chipsEl.appendChild(c);
+});
+
+document.getElementById('startBtn').addEventListener('click', runCrew);
+document.getElementById('restartBtn').addEventListener('click', () => window.location.reload());
+
+async function sampleJSON(prompt) {
+  const sample = await claude.use('sample');
+  if (!sample) throw { code: 'not_available', message: "AI access isn't available in this view." };
+  return sample.json(prompt, { modelTier: 'default' });
+}
+async function sampleText(prompt) {
+  const sample = await claude.use('sample');
+  if (!sample) throw { code: 'not_available', message: "AI access isn't available in this view." };
+  const res = await sample(prompt, { modelTier: 'default' });
+  return (res && res.text) || '';
+}
+
+async function runCrew() {
+  const goal = document.getElementById('goalInput').value.trim();
+  if (!goal) return;
+
+  const startBtn = document.getElementById('startBtn');
+  startBtn.disabled = true;
+  startBtn.textContent = 'Assigning...';
+  document.getElementById('crew').style.display = 'block';
+  document.getElementById('leadPlan').innerHTML = '<span class="spinner"></span>Lead agent is planning the work...';
+  document.getElementById('agentList').innerHTML = '';
+  document.getElementById('finalCard').style.display = 'none';
+
+  try {
+    // ---- Step 1: Lead agent plans and assigns ----
+    const planPrompt = `You are a lead agent coordinating a small team of specialist AI agents to complete this goal:
+
+"${goal}"
+
+Break this into exactly 3 sequential tasks for 3 specialist agents, where each agent builds on the previous one's work (e.g. a research/foundation agent, then a creation/drafting agent, then a review/polish agent — but tailor the actual roles and instructions to what this specific goal needs).
+
+Respond ONLY with valid JSON in exactly this shape:
+{
+  "plan_summary": "2-3 sentences explaining your plan and why you're splitting the work this way",
+  "agents": [
+    { "name": "a short role name, e.g. 'Research Agent'", "instruction": "a specific, clear instruction for what this agent should produce" },
+    { "name": "...", "instruction": "..." },
+    { "name": "...", "instruction": "..." }
+  ]
+}`;
+    const plan = await sampleJSON(planPrompt);
+    document.getElementById('leadPlan').textContent = plan.plan_summary || '';
+
+    // ---- Render agent cards ----
+    const agentListEl = document.getElementById('agentList');
+    const cards = plan.agents.map((agent, i) => {
+      const card = document.createElement('div');
+      card.className = 'agent-card';
+      card.innerHTML = `
+        <div class="agent-head">
+          <div>
+            <div class="agent-name">${escapeHtml(agent.name)}</div>
+            <div class="agent-task">${escapeHtml(agent.instruction)}</div>
+          </div>
+          <div class="agent-status queued">Queued</div>
+        </div>
+        <div class="agent-output"></div>
+      `;
+      agentListEl.appendChild(card);
+      if (i < plan.agents.length - 1) {
+        const conn = document.createElement('div');
+        conn.className = 'connector';
+        agentListEl.appendChild(conn);
+      }
+      return card;
+    });
+
+    // ---- Step 2: run each agent in sequence, passing prior outputs forward ----
+    let priorWork = '';
+    const outputs = [];
+    for (let i = 0; i < plan.agents.length; i++) {
+      const agent = plan.agents[i];
+      const card = cards[i];
+      card.classList.add('active');
+      card.querySelector('.agent-status').className = 'agent-status working';
+      card.querySelector('.agent-status').innerHTML = '<span class="spinner"></span>Working';
+
+      const workPrompt = `You are "${agent.name}", a specialist agent on a coordinated team working toward this overall goal:
+"${goal}"
+
+Your specific assigned task from the lead agent: ${agent.instruction}
+
+${priorWork ? `Work completed so far by earlier agents on the team:\n${priorWork}\n\nBuild on this — don't start from scratch or ignore it.` : 'You are the first agent on this — there is no prior work yet.'}
+
+Produce your output now. Respond with plain text only — just the actual output/deliverable for your task, no JSON, no meta-commentary about being an agent.`;
+
+      const output = await sampleText(workPrompt);
+      outputs.push({ name: agent.name, output });
+      priorWork += `\n\n[${agent.name}'s output]:\n${output}`;
+
+      card.classList.remove('active');
+      card.classList.add('done');
+      card.querySelector('.agent-status').className = 'agent-status done';
+      card.querySelector('.agent-status').textContent = 'Done';
+      const outEl = card.querySelector('.agent-output');
+      outEl.textContent = output;
+      outEl.classList.add('show');
+    }
+
+    // ---- Step 3: lead agent signs off ----
+    document.getElementById('finalCard').style.display = 'block';
+    document.getElementById('finalSignoff').innerHTML = '<span class="spinner"></span>Lead agent is reviewing the team\'s work...';
+    document.getElementById('finalDeliverable').textContent = '';
+
+    const signoffPrompt = `You are the lead agent. Your team just completed this goal:
+"${goal}"
+
+Here is what each specialist agent produced, in order:
+${priorWork}
+
+Write a short sign-off (2-3 sentences) summarizing what the team produced and confirming it's ready. Then provide the final deliverable — this should be the actual finished output for the original goal (typically the last agent's work, possibly lightly refined), not a summary of the process.
+
+Respond ONLY with valid JSON in exactly this shape:
+{
+  "signoff": "your 2-3 sentence summary",
+  "deliverable": "the final, ready-to-use output"
+}`;
+    const final = await sampleJSON(signoffPrompt);
+    document.getElementById('finalSignoff').textContent = final.signoff || '';
+    document.getElementById('finalDeliverable').textContent = final.deliverable || '';
+    document.getElementById('finalCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    document.getElementById('restartRow').style.display = 'block';
+  } catch (err) {
+    console.error(err);
+    const code = err && err.code ? err.code : 'unknown';
+    document.getElementById('leadPlan').textContent = `Something went wrong (${code}). Try again.`;
+    document.getElementById('restartRow').style.display = 'block';
+  } finally {
+    startBtn.disabled = false;
+    startBtn.textContent = 'Assign to the crew';
+  }
+}
+
+function escapeHtml(str) { const d = document.createElement('div'); d.textContent = str || ''; return d.innerHTML; }
+</script>
+</body>
+</html>
